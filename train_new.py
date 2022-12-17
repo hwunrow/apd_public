@@ -75,8 +75,8 @@ def load_configuration(arguments, name_dataset):
         else:
             exp_name = '%s-X-%s-X-%s@%s' % (model_name, opt_name, data_name, timestamp)
 
-    model_config = yaml.load(open(f_model_config, 'rb'))
-    opt_config = yaml.load(open(f_opt_config, 'rb'))
+    model_config = yaml.safe_load(open(f_model_config, 'rb'))
+    opt_config = yaml.safe_load(open(f_opt_config, 'rb'))
 
     print('\n\n\n\n>>>>>>>>> [Experiment Name]')
     print(exp_name)
@@ -352,7 +352,7 @@ def main(arguments):
         ####
         #### apd CONFIG
         ####
-        apd_config = yaml.load(open(arguments['--apd'], 'rb'))
+        apd_config = yaml.safe_load(open(arguments['--apd'], 'rb'))
         ## if any of the following is 0, make it =gan_bs
         apd_config['apd_buffer_size'] = apd_config['apd_buffer_size'] or gan_bs
         apd_config['T_sgld'] = apd_config['T_sgld'] or gan_bs
