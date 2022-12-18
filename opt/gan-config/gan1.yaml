@@ -1,8 +1,8 @@
 task: 'mnist'
 mode: 'wgan-gp'
-n_train: 10000
+# n_train: 10000
 # n_train: 5000
-# n_train: 1000
+n_train: 1000
 
 batch_size: 100  # Batch size
 test_input_batch_size: 500
@@ -20,7 +20,8 @@ gan_dim: 100  # The size of the hidden state in the generator and discriminator
 zdim: 32
 lambda: 10  # Gradient penalty lambda hyperparameter
 
-iters: 100000  # How many generator iterations to train for
+# iters: 100000  # How many generator iterations to train for
+iters: 500  # How many generator iterations to train for
 critic_iters: 5 # How many critic iterations per generator iteration
 
 num_test_runs: 10
