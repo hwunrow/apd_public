@@ -466,12 +466,8 @@ def get_dataloader(task, batch_size):
     elif name_dataset == 'mnist':
         # Train set
         trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-#         trainset.data_train = trainset.train_data[:size_trainset, :, :]
-#         trainset.labels_train = trainset.train_labels[:size_trainset]
         # Validation set
-        valset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-#         valset.data_train = valset.train_data[size_trainset:, :, :]
-#         valset.labels_train = valset.train_labels[size_trainset:]        
+        valset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)     
         # Test set
         testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
     elif name_dataset == 'fashion':
@@ -514,30 +510,10 @@ def get_dataloader(task, batch_size):
         first_5_class_idxs = [i for i in range(len(testset.test_labels)) if testset.test_labels[i] in [0,1,2,3,4]]
         testset.test_data = np.stack([testset.test_data[i, :, :, :] for i in first_5_class_idxs])
         testset.test_labels = np.stack([testset.test_labels[i] for i in first_5_class_idxs])
-    elif name_dataset == 'mnist-svhn':
-        transform = transforms.Compose([
-                    transforms.Scale(config.image_size),
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        svhn = datasets.SVHN(root=config.svhn_path, download=True, transform=transform)
+    elif name_dataset == 'svhn':
         trainset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
         valset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
         testset = torchvision.datasets.SVHN(root='./data', train=False, download=True, transform=transform)
-        # MNIST
-        trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        valset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-
-        svhn_loader = torch.utils.data.DataLoader(dataset=svhn,
-                                                  batch_size=config.batch_size,
-                                                  shuffle=True,
-                                                  num_workers=config.num_workers)
-    
-        mnist_loader = torch.utils.data.DataLoader(dataset=mnist,
-                                                   batch_size=config.batch_size,
-                                                   shuffle=True,
-                                                   num_workers=config.num_workers)
-        return svhn_loader, mnist_loader
 
     num_train = len(trainset)
     indices = list(range(num_train))
