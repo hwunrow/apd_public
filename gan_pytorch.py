@@ -325,7 +325,7 @@ class TrainGAN(object):
             if gan_mode=='wgan':
                 for p in D.parameters():
                     p.data.clamp_(-wgan_clip, wgan_clip)
-        return G_loss.data[0] if G_loss is not None else 0, D_loss.data[0]
+        return G_loss.data.item() if G_loss is not None else 0, D_loss.data.item()
 
 if __name__ == '__main__':
     try:

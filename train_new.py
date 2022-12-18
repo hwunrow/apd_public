@@ -183,7 +183,7 @@ def run_test_mc_dropout(model, dataloader, arguments):
 
     if not was_training:
         model.eval()
-    return mc_posterior_accuracy, mc_posterior_loss.data[0]
+    return mc_posterior_accuracy, mc_posterior_loss
 
 
 def get_dataloader(task, batch_size):

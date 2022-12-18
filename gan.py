@@ -369,156 +369,156 @@ if __name__ == '__main__':
         ### Test Anomaly detection ###
         ##############################
 
-        apd_anom_detection_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        sgld_anom_detection_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))  # { 5: 'f_entropy': [(87, 0.1), (89, 0.2), (91, 0.1)]}
+#         apd_anom_detection_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+#         sgld_anom_detection_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))  # { 5: 'f_entropy': [(87, 0.1), (89, 0.2), (91, 0.1)]}
 
-        for scale in opt_config['test_ood_scales']:
-            model.eval()  # Just to make sure model is in eval mode
+#         for scale in opt_config['test_ood_scales']:
+#             model.eval()  # Just to make sure model is in eval mode
 
-            scale = int(scale)
+#             scale = int(scale)
 
-            # Temporarily reset ood_scale in opt_config for simplicity with the rest of the code
-            opt_config['ood_scale'] = scale
-            ood_data = utils.load_ood_data(opt_config['task'], opt_config)
+#             # Temporarily reset ood_scale in opt_config for simplicity with the rest of the code
+#             opt_config['ood_scale'] = scale
+#             ood_data = utils.load_ood_data(opt_config['task'], opt_config)
 
-            print("OOD SCALE {}".format(scale))
-            print("--------------------------")
-
-
-            test_inputs_anomaly_detection = utils.get_anomaly_detection_test_inputs(testloader, opt_config, arguments)
-            if arguments['--cuda']:
-                test_inputs_anomaly_detection = test_inputs_anomaly_detection.cuda()
-                for key in ood_data:
-                    ood_data[key] = ood_data[key].cuda()
-
-            print("GAN OOD Results")
-            print("---------------")
-
-            for ood_dataset_name in opt_config['ood_datasets']:
-                print("OOD Dataset: {}".format(ood_dataset_name))
-
-                cur_ood_data = ood_data[ood_dataset_name]
-
-                for func_name in opt_config['ood_acq_funcs']:
-                    normality_base_rate_list = []
-                    auroc_list = []
-                    n_aupr_list = []
-                    ab_aupr_list = []
-
-                    for i in range(num_test_runs):
-                        # print("Test run {}".format(i))
-
-                        sample_params = []
-                        for _ in range(num_test_apd_samples // BATCH_SIZE + 1):
-                            sample_params.append(session.run(fake_data))
-                        sample_params = np.concatenate(sample_params, 0)
-                        sample_params = sample_params[:num_test_apd_samples]
-
-                        sample_dics = utils.prepare_torch_dicts(sample_params, model)
-                        posterior_weights = [1 for _ in range(len(sample_dics))]
-
-                        model.posterior_samples = sample_dics  # Should change this structure
-                        model.posterior_weights = posterior_weights
-
-                        if func_name == 'f_bald':
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq='f_bald')
-                        else:
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq=func_name)
-
-                        normality_base_rate_list.append(normality_base_rate)
-                        auroc_list.append(auroc)
-                        n_aupr_list.append(n_aupr)
-                        ab_aupr_list.append(ab_aupr)
-
-                    print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
-                          func_name,
-                          np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
-                          np.mean(auroc_list), np.std(auroc_list),
-                          np.mean(n_aupr_list), np.std(n_aupr_list),
-                          np.mean(ab_aupr_list), np.std(ab_aupr_list)))
-
-                    apd_anom_detection_results[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
-                                                                                      (np.mean(n_aupr_list), np.std(n_aupr_list)),
-                                                                                      (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
+#             print("OOD SCALE {}".format(scale))
+#             print("--------------------------")
 
 
-            print
-            print("Real OOD Results")
-            print("----------------")
+#             test_inputs_anomaly_detection = utils.get_anomaly_detection_test_inputs(testloader, opt_config, arguments)
+#             if arguments['--cuda']:
+#                 test_inputs_anomaly_detection = test_inputs_anomaly_detection.cuda()
+#                 for key in ood_data:
+#                     ood_data[key] = ood_data[key].cuda()
 
-            for ood_dataset_name in opt_config['ood_datasets']:
-                print("OOD Dataset: {}".format(ood_dataset_name))
+#             print("GAN OOD Results")
+#             print("---------------")
 
-                cur_ood_data = ood_data[ood_dataset_name]
+#             for ood_dataset_name in opt_config['ood_datasets']:
+#                 print("OOD Dataset: {}".format(ood_dataset_name))
 
-                for func_name in opt_config['ood_acq_funcs']:
+#                 cur_ood_data = ood_data[ood_dataset_name]
 
-                    normality_base_rate_list = []
-                    auroc_list = []
-                    n_aupr_list = []
-                    ab_aupr_list = []
+#                 for func_name in opt_config['ood_acq_funcs']:
+#                     normality_base_rate_list = []
+#                     auroc_list = []
+#                     n_aupr_list = []
+#                     ab_aupr_list = []
 
-                    for i in range(num_test_runs):
-                        # print("Test run {}".format(i))
-                        posterior_samples = utils.load_posterior_state_dicts(src_dir=src_dir, example_model=model, num_samples=num_test_sgld_samples)
-                        posterior_weights = [1 for _ in range(len(posterior_samples))]
-                        model.posterior_samples = posterior_samples  # Should change this structure
-                        model.posterior_weights = posterior_weights
+#                     for i in range(num_test_runs):
+#                         # print("Test run {}".format(i))
 
-                        if func_name == 'f_bald':
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq='f_bald')
-                        else:
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq=func_name)
+#                         sample_params = []
+#                         for _ in range(num_test_apd_samples // BATCH_SIZE + 1):
+#                             sample_params.append(session.run(fake_data))
+#                         sample_params = np.concatenate(sample_params, 0)
+#                         sample_params = sample_params[:num_test_apd_samples]
 
-                        normality_base_rate_list.append(normality_base_rate)
-                        auroc_list.append(auroc)
-                        n_aupr_list.append(n_aupr)
-                        ab_aupr_list.append(ab_aupr)
+#                         sample_dics = utils.prepare_torch_dicts(sample_params, model)
+#                         posterior_weights = [1 for _ in range(len(sample_dics))]
 
-                    print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
-                          func_name,
-                          np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
-                          np.mean(auroc_list), np.std(auroc_list),
-                          np.mean(n_aupr_list), np.std(n_aupr_list),
-                          np.mean(ab_aupr_list), np.std(ab_aupr_list)))
+#                         model.posterior_samples = sample_dics  # Should change this structure
+#                         model.posterior_weights = posterior_weights
 
-                    sgld_anom_detection_results[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
-                                                                                       (np.mean(n_aupr_list), np.std(n_aupr_list)),
-                                                                                       (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
+#                         if func_name == 'f_bald':
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq='f_bald')
+#                         else:
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq=func_name)
 
-        for scale in opt_config['test_ood_scales']:
-            for ood_dataset_name in opt_config['ood_datasets']:
-                apd_anom_detection_results[scale][ood_dataset_name] = dict(apd_anom_detection_results[scale][ood_dataset_name])
-                sgld_anom_detection_results[scale][ood_dataset_name] = dict(sgld_anom_detection_results[scale][ood_dataset_name])
-            apd_anom_detection_results[scale] = dict(apd_anom_detection_results[scale])
-            sgld_anom_detection_results[scale] = dict(sgld_anom_detection_results[scale])
+#                         normality_base_rate_list.append(normality_base_rate)
+#                         auroc_list.append(auroc)
+#                         n_aupr_list.append(n_aupr)
+#                         ab_aupr_list.append(ab_aupr)
 
-        apd_anom_detection_results = dict(apd_anom_detection_results)
-        sgld_anom_detection_results = dict(sgld_anom_detection_results)
+#                     print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
+#                           func_name,
+#                           np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
+#                           np.mean(auroc_list), np.std(auroc_list),
+#                           np.mean(n_aupr_list), np.std(n_aupr_list),
+#                           np.mean(ab_aupr_list), np.std(ab_aupr_list)))
 
-        with open(os.path.join('./gan_exps', exp_dir, 'apd_anom_res_g:{}_s:{}'.format(opt_config['gan_dim'],
-                                                                                      opt_config['num_test_apd_samples'])), 'wb') as f:
-            pkl.dump(apd_anom_detection_results, f)
+#                     apd_anom_detection_results[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
+#                                                                                       (np.mean(n_aupr_list), np.std(n_aupr_list)),
+#                                                                                       (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
 
-        with open(os.path.join('./gan_exps', exp_dir, 'sgld_anom_res_s:{}'.format(opt_config['num_test_sgld_samples'])), 'wb') as f:
-            pkl.dump(sgld_anom_detection_results, f)
 
-        print('-' * 89)
-        print('Experiment directory: {}'.format(os.path.join('gan_exps', exp_dir)))
-        print('-' * 89)
+#             print
+#             print("Real OOD Results")
+#             print("----------------")
+
+#             for ood_dataset_name in opt_config['ood_datasets']:
+#                 print("OOD Dataset: {}".format(ood_dataset_name))
+
+#                 cur_ood_data = ood_data[ood_dataset_name]
+
+#                 for func_name in opt_config['ood_acq_funcs']:
+
+#                     normality_base_rate_list = []
+#                     auroc_list = []
+#                     n_aupr_list = []
+#                     ab_aupr_list = []
+
+#                     for i in range(num_test_runs):
+#                         # print("Test run {}".format(i))
+#                         posterior_samples = utils.load_posterior_state_dicts(src_dir=src_dir, example_model=model, num_samples=num_test_sgld_samples)
+#                         posterior_weights = [1 for _ in range(len(posterior_samples))]
+#                         model.posterior_samples = posterior_samples  # Should change this structure
+#                         model.posterior_weights = posterior_weights
+
+#                         if func_name == 'f_bald':
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq='f_bald')
+#                         else:
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq=func_name)
+
+#                         normality_base_rate_list.append(normality_base_rate)
+#                         auroc_list.append(auroc)
+#                         n_aupr_list.append(n_aupr)
+#                         ab_aupr_list.append(ab_aupr)
+
+#                     print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
+#                           func_name,
+#                           np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
+#                           np.mean(auroc_list), np.std(auroc_list),
+#                           np.mean(n_aupr_list), np.std(n_aupr_list),
+#                           np.mean(ab_aupr_list), np.std(ab_aupr_list)))
+
+#                     sgld_anom_detection_results[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
+#                                                                                        (np.mean(n_aupr_list), np.std(n_aupr_list)),
+#                                                                                        (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
+
+#         for scale in opt_config['test_ood_scales']:
+#             for ood_dataset_name in opt_config['ood_datasets']:
+#                 apd_anom_detection_results[scale][ood_dataset_name] = dict(apd_anom_detection_results[scale][ood_dataset_name])
+#                 sgld_anom_detection_results[scale][ood_dataset_name] = dict(sgld_anom_detection_results[scale][ood_dataset_name])
+#             apd_anom_detection_results[scale] = dict(apd_anom_detection_results[scale])
+#             sgld_anom_detection_results[scale] = dict(sgld_anom_detection_results[scale])
+
+#         apd_anom_detection_results = dict(apd_anom_detection_results)
+#         sgld_anom_detection_results = dict(sgld_anom_detection_results)
+
+#         with open(os.path.join('./gan_exps', exp_dir, 'apd_anom_res_g:{}_s:{}'.format(opt_config['gan_dim'],
+#                                                                                       opt_config['num_test_apd_samples'])), 'wb') as f:
+#             pkl.dump(apd_anom_detection_results, f)
+
+#         with open(os.path.join('./gan_exps', exp_dir, 'sgld_anom_res_s:{}'.format(opt_config['num_test_sgld_samples'])), 'wb') as f:
+#             pkl.dump(sgld_anom_detection_results, f)
+
+#         print('-' * 89)
+#         print('Experiment directory: {}'.format(os.path.join('gan_exps', exp_dir)))
+#         print('-' * 89)

@@ -55,13 +55,13 @@ TOTAL=6000
 
 def get_model(exp_name, arguments):
     model_conf = 'model/config/' + exp_name[:exp_name.find('X')-1] + '.yaml'
-    model_config = yaml.load(open(model_conf, 'rb'))
+    model_config = yaml.safe_load(open(model_conf, 'rb'))
     model = eval(model_config['name'])(**model_config['kwargs'])
     model.load_state_dict(torch.load('saves/' + exp_name + '/best_point_model.th'))
     return utils.cuda(model, arguments)
 
 def get_generator(gan_dir, arguments):
-    gan_config = yaml.load(open(os.path.join(gan_dir, 'config.yaml')))
+    gan_config = yaml.safe_load(open(os.path.join(gan_dir, 'config.yaml')))
     zdim = int(gan_config['zdim'])
     hdim = int(gan_config['gan_dim'])
     odim = int(gan_config['output_dim'])
@@ -91,7 +91,7 @@ def get_opt_config(exp_name):
     }
     second_parts = exp_name[exp_name.find('X') + 2:]
     opt_config_name = second_parts[:second_parts.find('X') - 1]
-    opt_config = yaml.load(open('opt/config/' + opt_config_name + '.yaml', 'rb'))
+    opt_config = yaml.safe_load(open('opt/config/' + opt_config_name + '.yaml', 'rb'))
 
     # Fill in default configuration for keys that are not overwritten by the config file
     for key in default_config:
@@ -119,7 +119,8 @@ def get_dataset_id(exp_name):
 
 def gen_adv_examples(model, attack, arguments, total=TOTAL):
     model.eval()
-    fb_model = foolbox.models.PyTorchModel(model, (-1,1), 10, cuda=arguments['--cuda'])
+#     fb_model = foolbox.models.PyTorchModel(model, (-1,1), 10, cuda=arguments['--cuda'])
+    fb_model = foolbox.models.PyTorchModel(model, (-1,1))
     attack_instance = attack(fb_model)
 
     # Lousy programmer retrieve dataset
@@ -231,7 +232,7 @@ def main(arguments):
             model.load_state_dict(utils.prepare_torch_dicts(post_samples, model)[0])
 
         if attack_name.lower() == 'fgsm':
-            attack = foolbox.attacks.GradientSignAttack
+            attack = foolbox.attacks.LinfFastGradientAttack()
         elif attack_name.lower() == 'lbfgs':
             attack = foolbox.attacks.LBFGSAttack
         elif attack_name.lower() == 'pgd':

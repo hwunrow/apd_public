@@ -24,6 +24,14 @@ def sm_given_np_data(inputs, model):
     sm_oos = F.softmax(model.forward(inputs), -1)
     return sm_oos
 
+def inference_accuracy_by_cat(prediction, labels):
+    accuracy = [0 for c in range(10)]
+    for c in range(10):
+        correct = sum((prediction == labels.data.cpu().numpy()) * (labels.data.cpu().numpy() == c)).astype(float)
+        total = sum(labels.data.cpu().numpy() == c)
+        accuracy[c] = correct / total
+    return accuracy
+
 
 def inference_accuracy(prediction, labels):
     accuracy = (prediction == labels.data.cpu().numpy()).mean().astype(float)
@@ -511,9 +519,10 @@ def get_dataloader(task, batch_size):
         testset.test_data = np.stack([testset.test_data[i, :, :, :] for i in first_5_class_idxs])
         testset.test_labels = np.stack([testset.test_labels[i] for i in first_5_class_idxs])
     elif name_dataset == 'svhn':
-        trainset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
-        valset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
-        testset = torchvision.datasets.SVHN(root='./data', train=False, download=True, transform=transform)
+        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True)
+#         trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
+        valset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
+        testset = torchvision.datasets.SVHN(root='./data', split='extra', download=True, transform=transform)
 
     num_train = len(trainset)
     indices = list(range(num_train))

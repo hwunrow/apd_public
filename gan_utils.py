@@ -131,13 +131,14 @@ def evaluate(model, testloader, posterior_samples, posterior_weights, posterior_
         # Point Prediction
         point_outputs = model.forward(test_inputs)
         point_loss_batch = F.cross_entropy(point_outputs.cpu(), test_labels.cpu())
-        point_loss.append(point_loss_batch.data[0])
+        point_loss.append(point_loss_batch.data.item())
 
         # point_predictions = Loss.inference_prediction(point_outputs)
         prob_inputs = F.softmax(point_outputs)
         point_predictions = prob_inputs.data.cpu().numpy().argmax(1)
 
-        point_accuracy_batch = utils.inference_accuracy(point_predictions, test_labels)
+#         point_accuracy_batch = utils.inference_accuracy(point_predictions, test_labels)
+        point_accuracy_batch = utils.inference_accuracy_by_cat(point_predictions, test_labels)
         point_accuracy.append(point_accuracy_batch)
 
         # Bayesian Prediction
@@ -145,13 +146,14 @@ def evaluate(model, testloader, posterior_samples, posterior_weights, posterior_
             posterior_outputs = utils.posterior_expectation(model, test_inputs)
             # posterior_loss_batch = Loss.nll(torch.log(posterior_outputs), test_labels)
             posterior_loss_batch = F.nll_loss(torch.log(posterior_outputs.cpu()), test_labels.cpu())
-            posterior_loss.append(posterior_loss_batch.data[0])
+            posterior_loss.append(posterior_loss_batch.data.item())
 
             # posterior_predictions = Loss.inference_prediction(posterior_outputs)
             prob_inputs = F.softmax(posterior_outputs)
             posterior_predictions = prob_inputs.data.cpu().numpy().argmax(1)
 
-            posterior_accuracy_batch = utils.inference_accuracy(posterior_predictions, test_labels)
+#             posterior_accuracy_batch = utils.inference_accuracy(posterior_predictions, test_labels)
+            posterior_accuracy_batch = utils.inference_accuracy_by_cat(posterior_predictions, test_labels)
             posterior_accuracy.append(posterior_accuracy_batch)
 
     model.train()
@@ -161,7 +163,8 @@ def evaluate(model, testloader, posterior_samples, posterior_weights, posterior_
     point_loss = np.mean(point_loss)
 
     if posterior_flag == 1:
-        posterior_accuracy = np.mean(posterior_accuracy)
+#         posterior_accuracy = np.mean(posterior_accuracy)
+        posterior_accuracy = np.mean(np.array(posterior_accuracy), axis=0)
         posterior_loss = np.mean(posterior_loss)
 
     return point_accuracy, point_loss, posterior_accuracy, posterior_loss
