@@ -167,7 +167,8 @@ def run_test_mc_dropout(model, dataloader, arguments):
 
         inputs, labels = data
         inputs = utils.cuda(inputs, arguments)
-        inputs, labels = Variable(inputs, volatile=True), Variable(labels, volatile=True)
+        with torch.no_grad():
+            inputs, labels = Variable(inputs), Variable(labels)
 
         mean_probs = utils.mc_dropout_expectation(model, inputs, keep_samples=False, passes=int(arguments['--mc_dropout_passes']))
 
@@ -263,13 +264,14 @@ def evaluate(model, testloader, posterior_flag, Loss, opt_config):
         # data for inference
         test_inputs, test_labels = data
         test_inputs, test_labels = utils.cuda((test_inputs, test_labels), arguments)
-        test_inputs, test_labels = Variable(test_inputs, volatile=True), Variable(test_labels, volatile=True)
+        with torch.no_grad():
+            test_inputs, test_labels = Variable(test_inputs), Variable(test_labels)
 
         # Prediction
         # Point Prediction
         point_outputs = model.forward(test_inputs)
         point_loss_batch = F.cross_entropy(point_outputs, test_labels)
-        point_loss.append(point_loss_batch.data[0])
+        point_loss.append(point_loss_batch.data.item())
 
         point_predictions = Loss.inference_prediction(point_outputs)
         point_accuracy_batch = utils.inference_accuracy(point_predictions, test_labels)
@@ -281,7 +283,7 @@ def evaluate(model, testloader, posterior_flag, Loss, opt_config):
             posterior_outputs = utils.posterior_expectation(model, test_inputs, keep_samples=False, use_mini_batch=opt_config['batch_size'])
             # posterior_loss_batch = Loss.nll(torch.log(posterior_outputs), test_labels)
             posterior_loss_batch = F.nll_loss(torch.log(posterior_outputs), test_labels.cpu())
-            posterior_loss.append(posterior_loss_batch.data[0])
+            posterior_loss.append(posterior_loss_batch.data.item())
 
             posterior_predictions = Loss.inference_prediction(posterior_outputs)
             posterior_accuracy_batch = utils.inference_accuracy(posterior_predictions, test_labels)
@@ -454,9 +456,9 @@ def main(arguments):
                 training_loss = F.cross_entropy(outputs, labels)
                 training_loss.backward()  # Computes gradients of the model parameters wrt the loss
 
-                monitor.record_matplot(training_loss.data[0], iteration, 'train_loss')
+                monitor.record_matplot(training_loss.data.item(), iteration, 'train_loss')
 
-                prob_outputs = F.softmax(outputs)
+                prob_outputs = F.softmax(outputs, -1)
                 training_predictions = prob_outputs.data.cpu().numpy().argmax(1)
 
                 accuracy = utils.inference_accuracy(training_predictions, labels)
@@ -503,7 +505,7 @@ def main(arguments):
                         monitor.record_matplot(posterior_loss, iteration, 'bayesian_loss')
                     if posterior_accuracy:
                         print("It: {:5d} | Acc: {:.4f} | Point Acc: {:.4f} | Posterior Acc: {:.4f}".format(iteration, accuracy, point_accuracy, posterior_accuracy))
-                        print("It: {:5d} | Loss: {:.4f} | Point Loss: {:.4f} | Posterior Loss: {:.4f}".format(iteration, training_loss.data[0], point_loss, posterior_loss))
+                        print("It: {:5d} | Loss: {:.4f} | Point Loss: {:.4f} | Posterior Loss: {:.4f}".format(iteration, training_loss.data.item(), point_loss, posterior_loss))
                         sys.stdout.flush()
                     else:
                         print("It: {:5d} | Acc: {:.4f} | Point Acc: {:.4f}".format(iteration, accuracy, point_accuracy))

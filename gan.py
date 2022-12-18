@@ -198,7 +198,7 @@ if __name__ == '__main__':
     model = gan_utils.model_load_configuration(arguments)
     if arguments['--cuda']:
         model.cuda()  # Move the model onto the GPU
-
+    print(arguments['--cuda'])
     if TASK == 'toy2d':
         validater = gan_utils.EvalToy2d(model)
         task_fs = [validater.toy2d_validate]

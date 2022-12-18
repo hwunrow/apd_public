@@ -66,7 +66,7 @@ def model_load_configuration(arguments):
     src_dir = arguments['<src_dir>']
     # f_model_config = 'model/config/' + src_dir.split('.')[1].split('-X-')[0] + '.yaml'
     f_model_config = 'model/config/' + src_dir.split('-X-')[0] + '.yaml'
-    model_config = yaml.load(open(f_model_config, 'rb'))
+    model_config = yaml.safe_load(open(f_model_config, 'rb'))
     model = eval(model_config['name'])(**model_config['kwargs'])
     return model
 
@@ -88,7 +88,7 @@ def opt_load_configuration(f_opt_config, default_config):
             'sampling_type': 'random'
         }
 
-    opt_config = yaml.load(open(f_opt_config, 'rb'))
+    opt_config = yaml.safe_load(open(f_opt_config, 'rb'))
 
     # Fill in default configuration for keys that are not overwritten by the config file
     for key in default_config:
@@ -124,7 +124,8 @@ def evaluate(model, testloader, posterior_samples, posterior_weights, posterior_
         if arguments['--cuda']:
             test_inputs = test_inputs.cuda()
             test_labels = test_labels.cuda()
-        test_inputs, test_labels = Variable(test_inputs, volatile=True), Variable(test_labels, volatile=True)
+        with torch.no_grad():
+            test_inputs, test_labels = Variable(test_inputs), Variable(test_labels)
 
         # Prediction
         # Point Prediction
@@ -178,7 +179,8 @@ def get_anomaly_detection_test_inputs(testloader, opt_config):
         ood_test_inputs.append(test_inputs)
 
     ood_test_inputs = torch.cat(ood_test_inputs, 0)[:n_anom]
-    ood_test_inputs = Variable(ood_test_inputs, volatile=True)
+    with torch.no_grad():
+        ood_test_inputs = Variable(ood_test_inputs)
     return ood_test_inputs
 
 
@@ -248,18 +250,20 @@ class EvalMNIST(object):
         self.model = model
         transform = transforms.Compose([
                         transforms.ToTensor(),
-                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                        transforms.Normalize((0.5,), (0.5,)),
+#                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                     ])
 
         testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=opt_config['test_input_batch_size'], shuffle=False, num_workers=2)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=opt_config['test_input_batch_size'], shuffle=False, num_workers=1)
         dataiter = iter(testloader)
         test_inputs, test_labels = dataiter.next()
         if cuda:
             test_inputs = test_inputs.cuda()
             test_labels = test_labels.cuda()
-
-        test_inputs, test_labels = Variable(test_inputs, volatile=True), Variable(test_labels, volatile=True)
+        
+        with torch.no_grad():
+            test_inputs, test_labels = Variable(test_inputs), Variable(test_labels)
         if log_dir is not None:
             self.log_dir = log_dir
         else:
@@ -312,7 +316,7 @@ class EvalMNIST(object):
         posterior_predictions = Loss.inference_prediction(posterior_outputs)  # Checked
         posterior_accuracy = utils.inference_accuracy(posterior_predictions, test_labels)  # Checked
         print("Classification acc: {:.4f}".format(posterior_accuracy))
-        print("loss: {:.4f}".format(posterior_loss.data[0]))
+        print("loss: {:.4f}".format(posterior_loss.data.item()))
         lib.plot.plot('classification acc', posterior_accuracy)
 
         if log == 'fake':
@@ -395,8 +399,8 @@ class EvalCIFAR(object):
         if cuda:
             test_inputs = test_inputs.cuda()
             test_labels = test_labels.cuda()
-
-        test_inputs, test_labels = Variable(test_inputs, volatile=True), Variable(test_labels, volatile=True)
+        with torch.no_grad():
+            test_inputs, test_labels = Variable(test_inputs), Variable(test_labels)
 
         self.log_dir = log_dir
         self.accuracy_log_file = open(os.path.join(log_dir, 'acc_log.txt'), 'w')
@@ -441,7 +445,7 @@ class EvalCIFAR(object):
         posterior_predictions = Loss.inference_prediction(posterior_outputs)  # Checked
         posterior_accuracy = utils.inference_accuracy(posterior_predictions, test_labels)  # Checked
         print("Classification acc: {:.4f}".format(posterior_accuracy))
-        print("loss: {:.4f}".format(posterior_loss.data[0]))
+        print("loss: {:.4f}".format(posterior_loss.data.item()))
         lib.plot.plot('classification acc', posterior_accuracy)
 
         if log == 'fake':

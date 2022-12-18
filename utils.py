@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 
 def sm_given_np_data(inputs, model):
     model.eval()
-    sm_oos = F.softmax(model.forward(inputs))
+    sm_oos = F.softmax(model.forward(inputs), -1)
     return sm_oos
 
 
@@ -136,7 +136,8 @@ def get_anomaly_detection_test_inputs(testloader, opt_config, arguments):
     for i, data in enumerate(testloader, 0):
         test_inputs, test_labels = data
         test_inputs, test_labels = cuda((test_inputs, test_labels), arguments)
-        test_inputs = Variable(test_inputs, volatile=True)
+        with torch.no_grad():
+            test_inputs = Variable(test_inputs)
         if i <= num_batch_anomaly_detection:
             test_inputs_anomaly_detection.append(test_inputs)
 
@@ -343,7 +344,8 @@ def load_ood_dataset(name_dataset, ood_dataset_name, opt_config):
                         for letter in letters:
                             for example in letter:
                                 # squished_set.append(scimisc.imresize(1 - example[0], (28,28)).reshape(1, 28*28))
-                                squished_set.append(scimisc.imresize(1 - example[0], (28,28)))
+                                from skimage.transform import resize
+                                squished_set.append(resize(1 - example[0], (28,28)).reshape(1, 28*28))
 
             omniglot_images = np.stack(squished_set) * opt_config['ood_scale']
             ood_data = np.expand_dims(omniglot_images, axis=1)
@@ -353,7 +355,8 @@ def load_ood_dataset(name_dataset, ood_dataset_name, opt_config):
                 transforms.Grayscale(),
                 transforms.Resize((28,28)),
                 transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                transforms.Normalize((0.5,), (0.5,))
+#                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             ])
 
             cifar10_batch_size = 10
@@ -365,7 +368,8 @@ def load_ood_dataset(name_dataset, ood_dataset_name, opt_config):
 
             while True:
                 try:
-                    cifar10_images, _ = cifar10_testiter.next()
+                    cifar10_images, _ = next(cifar10_testiter)
+                    import pdb
                     ood_data_list.append(cifar10_images)
                 except StopIteration:
                     break
@@ -383,7 +387,8 @@ def load_ood_dataset(name_dataset, ood_dataset_name, opt_config):
             # 5 of the CIFAR-10 classes: dog, frog, horse, ship, truck
             transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                transforms.Normalize((0.5,), (0.5,)),
+#                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])
 
             cifar5_batch_size = 10
@@ -430,7 +435,8 @@ def load_ood_data(name_dataset, opt_config):
         ood_data_dict = {}
         for ood_dataset_name in opt_config['ood_datasets']:
             ood_dataset = load_ood_dataset(name_dataset, ood_dataset_name, opt_config)
-            ood_dataset = Variable(torch.FloatTensor(ood_dataset[:n_anom]), volatile=True)
+            with torch.no_grad():
+                ood_dataset = Variable(torch.FloatTensor(ood_dataset[:n_anom]))
             ood_data_dict[ood_dataset_name] = ood_dataset
         return ood_data_dict
 
@@ -441,7 +447,8 @@ def get_dataloader(task, batch_size):
 
     transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            transforms.Normalize((0.5,), (0.5,))
+#             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
     if name_dataset == 'babymnist':
@@ -458,12 +465,12 @@ def get_dataloader(task, batch_size):
     elif name_dataset == 'mnist':
         # Train set
         trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        trainset.train_data = trainset.train_data[:size_trainset, :, :]
-        trainset.train_labels = trainset.train_labels[:size_trainset]
+#         trainset.data_train = trainset.train_data[:size_trainset, :, :]
+#         trainset.labels_train = trainset.train_labels[:size_trainset]
         # Validation set
         valset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-        valset.train_data = valset.train_data[size_trainset:, :, :]
-        valset.train_labels = valset.train_labels[size_trainset:]
+#         valset.data_train = valset.train_data[size_trainset:, :, :]
+#         valset.labels_train = valset.train_labels[size_trainset:]        
         # Test set
         testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
     elif name_dataset == 'fashion':
@@ -506,10 +513,20 @@ def get_dataloader(task, batch_size):
         first_5_class_idxs = [i for i in range(len(testset.test_labels)) if testset.test_labels[i] in [0,1,2,3,4]]
         testset.test_data = np.stack([testset.test_data[i, :, :, :] for i in first_5_class_idxs])
         testset.test_labels = np.stack([testset.test_labels[i] for i in first_5_class_idxs])
+    
+    from torch.utils.data.sampler import SubsetRandomSampler
+    num_train = len(trainset)
+    indices = list(range(num_train))
+    train_idx, valid_idx = indices[:size_trainset], indices[size_trainset:]
+    train_sampler = SubsetRandomSampler(train_idx)
+    valid_sampler = SubsetRandomSampler(valid_idx)
 
+#     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, sampler=train_sampler, num_workers=2)
+#     valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, sampler=valid_sampler, num_workers=2)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
     valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=2)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
+    
     return trainloader, valloader, testloader, name_dataset
 
 
