@@ -16,6 +16,7 @@ from torch.autograd import Variable
 
 import torchvision
 import torchvision.transforms as transforms
+from torch.utils.data.sampler import SubsetRandomSampler
 
 
 def sm_given_np_data(inputs, model):
@@ -513,8 +514,31 @@ def get_dataloader(task, batch_size):
         first_5_class_idxs = [i for i in range(len(testset.test_labels)) if testset.test_labels[i] in [0,1,2,3,4]]
         testset.test_data = np.stack([testset.test_data[i, :, :, :] for i in first_5_class_idxs])
         testset.test_labels = np.stack([testset.test_labels[i] for i in first_5_class_idxs])
+    elif name_dataset == 'mnist-svhn':
+        transform = transforms.Compose([
+                    transforms.Scale(config.image_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        svhn = datasets.SVHN(root=config.svhn_path, download=True, transform=transform)
+        trainset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
+        valset = torchvision.datasets.SVHN(root='./data', train=True, download=True, transform=transform)
+        testset = torchvision.datasets.SVHN(root='./data', train=False, download=True, transform=transform)
+        # MNIST
+        trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        valset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+        testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+
+        svhn_loader = torch.utils.data.DataLoader(dataset=svhn,
+                                                  batch_size=config.batch_size,
+                                                  shuffle=True,
+                                                  num_workers=config.num_workers)
     
-    from torch.utils.data.sampler import SubsetRandomSampler
+        mnist_loader = torch.utils.data.DataLoader(dataset=mnist,
+                                                   batch_size=config.batch_size,
+                                                   shuffle=True,
+                                                   num_workers=config.num_workers)
+        return svhn_loader, mnist_loader
+
     num_train = len(trainset)
     indices = list(range(num_train))
     train_idx, valid_idx = indices[:size_trainset], indices[size_trainset:]
