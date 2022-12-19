@@ -122,7 +122,6 @@ def mc_dropout_expectation(model, inputs, keep_samples=False, passes=50):
     model.train()
     output_probs_list = []
     for i in range(int(passes)):
-
         outputs = model.forward(inputs)
         outputs = outputs.cpu()
         output_probs = F.softmax(outputs)
@@ -325,7 +324,7 @@ def show_ood_detection_results_softmax(in_examples, out_examples, f_pred, f_kwar
 
 
 def load_ood_dataset(name_dataset, ood_dataset_name, opt_config):
-    if name_dataset in ['mnist', 'fashion']:
+    if name_dataset in ['mnist', 'fashion', 'svhn']:
         if ood_dataset_name == 'notMNIST':
             # N_ANOM = 2000
             pickle_file = './data/notMNIST.pickle'
@@ -519,10 +518,14 @@ def get_dataloader(task, batch_size):
         testset.test_data = np.stack([testset.test_data[i, :, :, :] for i in first_5_class_idxs])
         testset.test_labels = np.stack([testset.test_labels[i] for i in first_5_class_idxs])
     elif name_dataset == 'svhn':
-        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True)
-#         trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
+        transform = transforms.Compose([
+            transforms.Scale(28),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
         valset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
-        testset = torchvision.datasets.SVHN(root='./data', split='extra', download=True, transform=transform)
+        testset = torchvision.datasets.SVHN(root='./data', split='test', download=True, transform=transform)
 
     num_train = len(trainset)
     indices = list(range(num_train))
