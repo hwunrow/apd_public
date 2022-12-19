@@ -345,7 +345,10 @@ if __name__ == '__main__':
 
         print("GAN Classification Results")
         print("--------------------------")
-        print("Test Accuracy: Mean {}, Std {}\n".format(np.mean(gan_accuracy_list), np.std(gan_accuracy_list)))
+        print("Test Accuracy: Mean {}, Std {}\n".format(np.mean(np.array(gan_accuracy_list), axis=0), np.std(gan_accuracy_list)))
+        with open(os.path.join('./gan_exps', exp_dir, "gan_accuracy.npy"), 'wb') as f:
+            np.save(f, np.mean(np.array(gan_accuracy_list), axis=0))
+        
 
         real_accuracy_list = []
         for i in range(num_test_runs):
@@ -362,7 +365,9 @@ if __name__ == '__main__':
 
         print("Real Sample Classification Results")
         print("----------------------------------")
-        print("Test Accuracy: Mean {}, Std {}\n".format(np.mean(real_accuracy_list), np.std(real_accuracy_list)))
+        print("Test Accuracy: Mean {}, Std {}\n".format(np.mean(np.array(real_accuracy_list), axis=0), np.std(real_accuracy_list)))
+        with open(os.path.join('./gan_exps', exp_dir, "real_accuracy.npy"), 'wb') as f:
+            np.save(f, np.mean(np.array(real_accuracy_list), axis=0))
 
 
         ##############################
