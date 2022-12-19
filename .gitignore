@@ -3,7 +3,6 @@ doc/*.bbl
 doc/*.blg
 doc/*.log
 *.png
-*.ipynb
 gan_exps/
 saves/
 logs/
