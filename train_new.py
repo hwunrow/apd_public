@@ -155,7 +155,7 @@ def posterior_sampling(sample_size, model, learning_rate):
 #########################
 ### Anomaly Detection ###
 #########################
-def run_test_mc_dropout(model, dataloader, arguments):
+def run_test_mc_dropout(model, dataloader, arguments, name_task=None):
     # To be used on val and test sets
     was_training = model.training
     model.train()  # Important: keep train mode on for MC dropout
@@ -169,7 +169,8 @@ def run_test_mc_dropout(model, dataloader, arguments):
         inputs = utils.cuda(inputs, arguments)
         with torch.no_grad():
             inputs, labels = Variable(inputs), Variable(labels)
-
+        if name_task.split('-')[0] == 'svhn':
+            inputs = torch.mean(inputs, 1)
         mean_probs = utils.mc_dropout_expectation(model, inputs, keep_samples=False, passes=int(arguments['--mc_dropout_passes']))
 
         mean_predictions = mean_probs.data.cpu().numpy().argmax(1)
@@ -247,7 +248,7 @@ def get_dataloader(task, batch_size):
     return trainloader, valloader, testloader, name_dataset
 
 
-def evaluate(model, testloader, posterior_flag, Loss, opt_config):
+def evaluate(model, testloader, posterior_flag, Loss, opt_config, name_task=None):
     model.eval()
     posterior_weights = model.posterior_weights
     posterior_samples = model.posterior_samples
@@ -264,6 +265,8 @@ def evaluate(model, testloader, posterior_flag, Loss, opt_config):
         # data for inference
         test_inputs, test_labels = data
         test_inputs, test_labels = utils.cuda((test_inputs, test_labels), arguments)
+        if name_task.split('-')[0] == 'svhn':
+            test_inputs = torch.mean(test_inputs, 1)
         with torch.no_grad():
             test_inputs, test_labels = Variable(test_inputs), Variable(test_labels)
 
@@ -451,6 +454,8 @@ def main(arguments):
 
                 # Inference
                 optimizer.zero_grad()
+                if name_task.split('-')[0] == 'svhn':
+                    inputs = torch.mean(inputs, 1)
                 outputs = models[0].forward(inputs)
 
                 training_loss = F.cross_entropy(outputs, labels)
@@ -495,7 +500,7 @@ def main(arguments):
                     print("Num posterior samples/Model: {}\nNum Chains: {}, Total: {}".\
                                 format(len(model.posterior_samples), len(models), len(models)*len(model.posterior_samples) ))
                     # point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(models[1], valloader,  posterior_flag, Loss)
-                    point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(models[0], valloader,  posterior_flag, Loss, opt_config)
+                    point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(models[0], valloader,  posterior_flag, Loss, opt_config, name_task=name_task)
 
                     monitor.record_matplot(point_accuracy, iteration, 'point_acc')
                     monitor.record_matplot(point_loss, iteration, 'point_loss')
@@ -515,7 +520,7 @@ def main(arguments):
                     ### MC-Dropout ###
                     ##################
                     if arguments['--mc_dropout_passes'] and int(arguments['--mc_dropout_passes']) > 0:
-                        test_mc_accuracy, test_mc_loss = run_test_mc_dropout(model, valloader, arguments)
+                        test_mc_accuracy, test_mc_loss = run_test_mc_dropout(model, valloader, arguments, name_task=name_task)
                         monitor.record_matplot(test_mc_accuracy, iteration, 'mcdrop_acc')
                         monitor.record_matplot(test_mc_loss, iteration,     'mcdrop_loss')
                         print("MC-Dropout Val Accuracy: {:.4f}".format(test_mc_accuracy))
@@ -551,7 +556,7 @@ def main(arguments):
                         gmodel.posterior_weights = [1 for _ in range(len(gmodel.posterior_samples))]
 
                         ## copied from above, TODO: loop
-                        point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(gmodel, valloader,  posterior_flag, Loss, opt_config)
+                        point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(gmodel, valloader,  posterior_flag, Loss, opt_config, name_task=name_task)
 
                         # monitor.record_matplot(point_accuracy, iteration, 'point_acc')
                         # monitor.record_matplot(point_loss, iteration, 'point_loss')
@@ -567,108 +572,108 @@ def main(arguments):
                     #########################
                     ### Anomaly detection ###
                     #########################
-                    test_inputs_anomaly_detection = utils.get_anomaly_detection_test_inputs(valloader, opt_config, arguments)
-                    test_inputs_anomaly_detection = utils.cuda(test_inputs_anomaly_detection, arguments)
-                    ood_data = utils.cuda(ood_data, arguments)
+#                     test_inputs_anomaly_detection = utils.get_anomaly_detection_test_inputs(valloader, opt_config, arguments)
+#                     test_inputs_anomaly_detection = utils.cuda(test_inputs_anomaly_detection, arguments)
+#                     ood_data = utils.cuda(ood_data, arguments)
 
 
-                    # # Bayesian
-                    for ood_dataset_name in opt_config['ood_datasets']:
-                        print("OOD Dataset: {}".format(ood_dataset_name))
+#                     # # Bayesian
+#                     for ood_dataset_name in opt_config['ood_datasets']:
+#                         print("OOD Dataset: {}".format(ood_dataset_name))
 
-                        cur_ood_data = ood_data[ood_dataset_name]
+#                         cur_ood_data = ood_data[ood_dataset_name]
 
-                        for func_name in opt_config['ood_acq_funcs']:
+#                         for func_name in opt_config['ood_acq_funcs']:
 
-                            if func_name != 'f_bald':
-                                # Non-bayesian
-                                normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(
-                                    test_inputs_anomaly_detection, cur_ood_data, utils.sm_given_np_data, {'model': model}, f_acq=func_name)
-                                print(
-                                    "(Non-Bayesian {}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
-                                        func_name, normality_base_rate, auroc, n_aupr, ab_aupr))
+#                             if func_name != 'f_bald':
+#                                 # Non-bayesian
+#                                 normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(
+#                                     test_inputs_anomaly_detection, cur_ood_data, utils.sm_given_np_data, {'model': model}, f_acq=func_name)
+#                                 print(
+#                                     "(Non-Bayesian {}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
+#                                         func_name, normality_base_rate, auroc, n_aupr, ab_aupr))
 
-                    # Bayesian
-                    if posterior_flag == 1:
-                        print
+#                     # Bayesian
+#                     if posterior_flag == 1:
+#                         print
 
-                        for ood_dataset_name in opt_config['ood_datasets']:
-                            print("OOD Dataset: {}".format(ood_dataset_name))
-                            cur_ood_data = ood_data[ood_dataset_name]
-                            for func_name in opt_config['ood_acq_funcs']:
-                                print("Func name = {}".format(func_name))
-                                if func_name == 'f_bald':
-                                    normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                           cur_ood_data,
-                                                                                                                           utils.posterior_expectation,
-                                                                                                                           {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                           f_acq='f_bald')
-                                else:
-                                    normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                           cur_ood_data,
-                                                                                                                           utils.posterior_expectation,
-                                                                                                                           {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                           f_acq=func_name)
-                                print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
+#                         for ood_dataset_name in opt_config['ood_datasets']:
+#                             print("OOD Dataset: {}".format(ood_dataset_name))
+#                             cur_ood_data = ood_data[ood_dataset_name]
+#                             for func_name in opt_config['ood_acq_funcs']:
+#                                 print("Func name = {}".format(func_name))
+#                                 if func_name == 'f_bald':
+#                                     normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                            cur_ood_data,
+#                                                                                                                            utils.posterior_expectation,
+#                                                                                                                            {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                            f_acq='f_bald')
+#                                 else:
+#                                     normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                            cur_ood_data,
+#                                                                                                                            utils.posterior_expectation,
+#                                                                                                                            {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                            f_acq=func_name)
+#                                 print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
 
 
 
                     # MC-Dropout
-                    if arguments['--mc_dropout_passes'] and int(arguments['--mc_dropout_passes']) > 0:
-                        print
+#                     if arguments['--mc_dropout_passes'] and int(arguments['--mc_dropout_passes']) > 0:
+#                         print
 
-                        for ood_dataset_name in opt_config['ood_datasets']:
-                            print("OOD Dataset: {}".format(ood_dataset_name))
-                            cur_ood_data = ood_data[ood_dataset_name]
+#                         for ood_dataset_name in opt_config['ood_datasets']:
+#                             print("OOD Dataset: {}".format(ood_dataset_name))
+#                             cur_ood_data = ood_data[ood_dataset_name]
 
-                            for func_name in opt_config['ood_acq_funcs']:
-                                if func_name == 'f_bald':
-                                    keep_samples = True
-                                else:
-                                    keep_samples = False
-                                normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                       cur_ood_data,
-                                                                                                                       utils.mc_dropout_expectation,
-                                                                                                                       {'model': model, 'passes': arguments['--mc_dropout_passes'], 'keep_samples': keep_samples},
-                                                                                                                       f_acq=func_name)
-                                print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
+#                             for func_name in opt_config['ood_acq_funcs']:
+#                                 if func_name == 'f_bald':
+#                                     keep_samples = True
+#                                 else:
+#                                     keep_samples = False
+#                                 normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                        cur_ood_data,
+#                                                                                                                        utils.mc_dropout_expectation,
+#                                                                                                                        {'model': model, 'passes': arguments['--mc_dropout_passes'], 'keep_samples': keep_samples},
+#                                                                                                                        f_acq=func_name)
+#                                 print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
 
                     ################
                     ### apd Anom ###
                     ################
-                    if arguments['--apd']:
-                        ## create a new model instance to hold GAN samples
-                        ## Model
-                        gmodel = eval(model_config['name'])(**model_config['kwargs'])
-                        gmodel = utils.cuda(gmodel, arguments)
-                        ## get the samples
-                        gmodel.posterior_samples = obj_traingan.get_samples(sample_size)
-                        gmodel.posterior_weights = [1 for _ in range(len(gmodel.posterior_samples))]
+#                     if arguments['--apd']:
+#                         ## create a new model instance to hold GAN samples
+#                         ## Model
+#                         gmodel = eval(model_config['name'])(**model_config['kwargs'])
+#                         gmodel = utils.cuda(gmodel, arguments)
+#                         ## get the samples
+#                         gmodel.posterior_samples = obj_traingan.get_samples(sample_size)
+#                         gmodel.posterior_weights = [1 for _ in range(len(gmodel.posterior_samples))]
 
-                        ## copied from above, TODO: loop
-                        for ood_dataset_name in opt_config['ood_datasets']:
-                            print("OOD Dataset: {}".format(ood_dataset_name))
+#                         ## copied from above, TODO: loop
+#                         for ood_dataset_name in opt_config['ood_datasets']:
+#                             print("OOD Dataset: {}".format(ood_dataset_name))
 
-                            cur_ood_data = ood_data[ood_dataset_name]
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data,  utils.posterior_expectation,
-                                                                                                                   {'model': gmodel, 'use_mini_batch': opt_config['batch_size']})
-                            print(
-                            "(apd) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
-                                normality_base_rate, auroc, n_aupr, ab_aupr))
-                            monitor.record_matplot(auroc, gan_iter, 'apd_auroc')
-                            monitor.record_matplot(n_aupr, gan_iter, 'apd_aupr+')
-                            monitor.record_matplot(ab_aupr, gan_iter, 'apd_aupr-')
+#                             cur_ood_data = ood_data[ood_dataset_name]
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data,  utils.posterior_expectation,
+#                                                                                                                    {'model': gmodel, 'use_mini_batch': opt_config['batch_size']})
+#                             print(
+#                             "(apd) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
+#                                 normality_base_rate, auroc, n_aupr, ab_aupr))
+#                             monitor.record_matplot(auroc, gan_iter, 'apd_auroc')
+#                             monitor.record_matplot(n_aupr, gan_iter, 'apd_aupr+')
+#                             monitor.record_matplot(ab_aupr, gan_iter, 'apd_aupr-')
 
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data,  utils.posterior_expectation,
-                                                                                                                   {'model': gmodel,'keep_samples': True, 'use_mini_batch': opt_config['batch_size']}, f_acq='f_bald')
-                            print(
-                            "(apd BALD) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
-                                normality_base_rate, auroc, n_aupr, ab_aupr))
-                            monitor.record_matplot(auroc, gan_iter, 'abald_auroc')
-                            monitor.record_matplot(n_aupr, gan_iter, 'abald_aupr+')
-                            monitor.record_matplot(ab_aupr, gan_iter, 'abald_aupr-')
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data,  utils.posterior_expectation,
+#                                                                                                                    {'model': gmodel,'keep_samples': True, 'use_mini_batch': opt_config['batch_size']}, f_acq='f_bald')
+#                             print(
+#                             "(apd BALD) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
+#                                 normality_base_rate, auroc, n_aupr, ab_aupr))
+#                             monitor.record_matplot(auroc, gan_iter, 'abald_auroc')
+#                             monitor.record_matplot(n_aupr, gan_iter, 'abald_aupr+')
+#                             monitor.record_matplot(ab_aupr, gan_iter, 'abald_aupr-')
 
-                    print
+#                     print
 
 
                 if iteration > 0 and iteration % (sample_size*sample_interval) == 0:
@@ -756,7 +761,7 @@ def main(arguments):
             posterior_weights = [1 for _ in range(len(posterior_samples))]
             model.posterior_samples = posterior_samples  # Should change this structure
             model.posterior_weights = posterior_weights
-            point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(model, testloader,posterior_flag, Loss, opt_config)
+            point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(model, testloader,posterior_flag, Loss, opt_config, name_task=name_task)
             print("Posterior acc: {}".format(posterior_accuracy))
             accuracy_list.append(posterior_accuracy)
 
@@ -775,7 +780,7 @@ def main(arguments):
 
         mc_accuracy_list = []
         for i in range(num_test_runs):
-            test_mc_accuracy, test_mc_loss = run_test_mc_dropout(model, testloader, arguments)
+            test_mc_accuracy, test_mc_loss = run_test_mc_dropout(model, testloader, arguments, name_task=name_task)
             mc_accuracy_list.append(test_mc_accuracy)
 
         print("MC-Dropout Test Results")
@@ -786,7 +791,7 @@ def main(arguments):
     best_model_state_dict = torch.load(os.path.join('saves', exp_name, 'best_point_model.th'))
     model.load_state_dict(best_model_state_dict)
 
-    point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(model, testloader, posterior_flag, Loss, opt_config)
+    point_accuracy, point_loss, posterior_accuracy, posterior_loss = evaluate(model, testloader, posterior_flag, Loss, opt_config, name_task=name_task)
 
     if posterior_accuracy:
         print("Point Acc: {:.4f} | Posterior Acc: {:.4f}".format(point_accuracy, posterior_accuracy))
@@ -822,82 +827,82 @@ def main(arguments):
         ############################################
 
         # Load model with best val accuracy
-        best_model_state_dict = torch.load(os.path.join('saves', exp_name, 'best_point_model.th'))
-        model.load_state_dict(best_model_state_dict)
+#         best_model_state_dict = torch.load(os.path.join('saves', exp_name, 'best_point_model.th'))
+#         model.load_state_dict(best_model_state_dict)
 
-        for ood_dataset_name in opt_config['ood_datasets']:
-            print("OOD Dataset: {}".format(ood_dataset_name))
+#         for ood_dataset_name in opt_config['ood_datasets']:
+#             print("OOD Dataset: {}".format(ood_dataset_name))
 
-            cur_ood_data = ood_data[ood_dataset_name]
+#             cur_ood_data = ood_data[ood_dataset_name]
 
-            for func_name in opt_config['ood_acq_funcs']:
+#             for func_name in opt_config['ood_acq_funcs']:
 
-                if func_name != 'f_bald':
-                    # Non-bayesian
-                    normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(
-                        test_inputs_anomaly_detection, cur_ood_data, utils.sm_given_np_data, {'model': model}, f_acq=func_name)
-                    print(
-                        "({} Non-Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
-                            func_name, normality_base_rate, auroc, n_aupr, ab_aupr))
+#                 if func_name != 'f_bald':
+#                     # Non-bayesian
+#                     normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(
+#                         test_inputs_anomaly_detection, cur_ood_data, utils.sm_given_np_data, {'model': model}, f_acq=func_name)
+#                     print(
+#                         "({} Non-Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(
+#                             func_name, normality_base_rate, auroc, n_aupr, ab_aupr))
 
-                    anom_result_dict[scale][ood_dataset_name][func_name] = [auroc, n_aupr, ab_aupr]
+#                     anom_result_dict[scale][ood_dataset_name][func_name] = [auroc, n_aupr, ab_aupr]
 
             # anomaly_detection_monitor.record_matplot([auroc, n_aupr, ab_aupr], iteration, 'point_estimation')
 
         #################################################
         ### Test Bayesian (Sampled) Anomaly Detection ###
         #################################################
-        if posterior_flag == 1:
-            print
+#         if posterior_flag == 1:
+#             print
 
-            for ood_dataset_name in opt_config['ood_datasets']:
-                print("OOD Dataset: {}".format(ood_dataset_name))
+#             for ood_dataset_name in opt_config['ood_datasets']:
+#                 print("OOD Dataset: {}".format(ood_dataset_name))
 
-                cur_ood_data = ood_data[ood_dataset_name]
+#                 cur_ood_data = ood_data[ood_dataset_name]
 
-                for func_name in opt_config['ood_acq_funcs']:
-                    normality_base_rate_list = []
-                    auroc_list = []
-                    n_aupr_list = []
-                    ab_aupr_list = []
+#                 for func_name in opt_config['ood_acq_funcs']:
+#                     normality_base_rate_list = []
+#                     auroc_list = []
+#                     n_aupr_list = []
+#                     ab_aupr_list = []
 
-                    for i in range(num_test_runs):
-                        posterior_samples = utils.load_posterior_state_dicts(src_dir=exp_name, example_model=model, num_samples=num_samples)
-                        posterior_weights = [1 for _ in range(len(posterior_samples))]
-                        model.posterior_samples = posterior_samples  # Should change this structure
-                        model.posterior_weights = posterior_weights
+#                     for i in range(num_test_runs):
+#                         posterior_samples = utils.load_posterior_state_dicts(src_dir=exp_name, example_model=model, num_samples=num_samples)
+#                         posterior_weights = [1 for _ in range(len(posterior_samples))]
+#                         model.posterior_samples = posterior_samples  # Should change this structure
+#                         model.posterior_weights = posterior_weights
 
-                        # normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data, utils.posterior_expectation,
-                        #                                                                                        # {'model': model})
-                        #                                                                                        {'model': model, 'use_mini_batch': opt_config['batch_size']})
-                        if func_name == 'f_bald':
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq='f_bald')
-                        else:
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.posterior_expectation,
-                                                                                                                   {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
-                                                                                                                   f_acq=func_name)
+#                         # normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data, utils.posterior_expectation,
+#                         #                                                                                        # {'model': model})
+#                         #                                                                                        {'model': model, 'use_mini_batch': opt_config['batch_size']})
+#                         if func_name == 'f_bald':
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': True, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq='f_bald')
+#                         else:
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.posterior_expectation,
+#                                                                                                                    {'model': model, 'keep_samples': False, 'use_mini_batch': opt_config['batch_size']},
+#                                                                                                                    f_acq=func_name)
 
-                        normality_base_rate_list.append(normality_base_rate)
-                        auroc_list.append(auroc)
-                        n_aupr_list.append(n_aupr)
-                        ab_aupr_list.append(ab_aupr)
+#                         normality_base_rate_list.append(normality_base_rate)
+#                         auroc_list.append(auroc)
+#                         n_aupr_list.append(n_aupr)
+#                         ab_aupr_list.append(ab_aupr)
 
-                    print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
-                          func_name,
-                          np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
-                          np.mean(auroc_list), np.std(auroc_list),
-                          np.mean(n_aupr_list), np.std(n_aupr_list),
-                          np.mean(ab_aupr_list), np.std(ab_aupr_list)))
+#                     print("({} Bayesian) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
+#                           func_name,
+#                           np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
+#                           np.mean(auroc_list), np.std(auroc_list),
+#                           np.mean(n_aupr_list), np.std(n_aupr_list),
+#                           np.mean(ab_aupr_list), np.std(ab_aupr_list)))
 
-                    anom_result_dict[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
-                                                                            (np.mean(n_aupr_list), np.std(n_aupr_list)),
-                                                                            (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
+#                     anom_result_dict[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
+#                                                                             (np.mean(n_aupr_list), np.std(n_aupr_list)),
+#                                                                             (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
 
                 # anomaly_detection_monitor.record_matplot([auroc, n_aupr, ab_aupr], iteration, 'bayesian')
 
@@ -906,59 +911,59 @@ def main(arguments):
         ### Test MC-Dropout Anomaly Detection ###
         #########################################
 
-        if arguments['--mc_dropout_passes'] and int(arguments['--mc_dropout_passes']) > 0:
-            print
+#         if arguments['--mc_dropout_passes'] and int(arguments['--mc_dropout_passes']) > 0:
+#             print
 
-            # Re-load model with best val accuracy
-            best_model_state_dict = torch.load(os.path.join('saves', exp_name, 'best_mc_model.th'))
-            model.load_state_dict(best_model_state_dict)
+#             # Re-load model with best val accuracy
+#             best_model_state_dict = torch.load(os.path.join('saves', exp_name, 'best_mc_model.th'))
+#             model.load_state_dict(best_model_state_dict)
 
-            for ood_dataset_name in opt_config['ood_datasets']:
-                print("OOD Dataset: {}".format(ood_dataset_name))
-                cur_ood_data = ood_data[ood_dataset_name]
+#             for ood_dataset_name in opt_config['ood_datasets']:
+#                 print("OOD Dataset: {}".format(ood_dataset_name))
+#                 cur_ood_data = ood_data[ood_dataset_name]
 
-                for func_name in opt_config['ood_acq_funcs']:
-                    normality_base_rate_list = []
-                    auroc_list = []
-                    n_aupr_list = []
-                    ab_aupr_list = []
+#                 for func_name in opt_config['ood_acq_funcs']:
+#                     normality_base_rate_list = []
+#                     auroc_list = []
+#                     n_aupr_list = []
+#                     ab_aupr_list = []
 
-                    for i in range(num_test_runs):
-                        if func_name != 'f_bald':
-                            normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
-                                                                                                                   cur_ood_data,
-                                                                                                                   utils.mc_dropout_expectation,
-                                                                                                                   {'model': model, 'passes': arguments['--mc_dropout_passes'], 'keep_samples': False},
-                                                                                                                   f_acq=func_name)
-                        # normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data, utils.mc_dropout_expectation,
-                        #                                                                                        {'model': model, 'passes': arguments['--mc_dropout_passes']})
-                        normality_base_rate_list.append(normality_base_rate)
-                        auroc_list.append(auroc)
-                        n_aupr_list.append(n_aupr)
-                        ab_aupr_list.append(ab_aupr)
+#                     for i in range(num_test_runs):
+#                         if func_name != 'f_bald':
+#                             normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection,
+#                                                                                                                    cur_ood_data,
+#                                                                                                                    utils.mc_dropout_expectation,
+#                                                                                                                    {'model': model, 'passes': arguments['--mc_dropout_passes'], 'keep_samples': False},
+#                                                                                                                    f_acq=func_name)
+#                         # normality_base_rate, auroc, n_aupr, ab_aupr = utils.show_ood_detection_results_softmax(test_inputs_anomaly_detection, cur_ood_data, utils.mc_dropout_expectation,
+#                         #                                                                                        {'model': model, 'passes': arguments['--mc_dropout_passes']})
+#                         normality_base_rate_list.append(normality_base_rate)
+#                         auroc_list.append(auroc)
+#                         n_aupr_list.append(n_aupr)
+#                         ab_aupr_list.append(ab_aupr)
 
-                    # print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
-                    print("({} MC-Dropout) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
-                          func_name,
-                          np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
-                          np.mean(auroc_list), np.std(auroc_list),
-                          np.mean(n_aupr_list), np.std(n_aupr_list),
-                          np.mean(ab_aupr_list), np.std(ab_aupr_list)))
+#                     # print("({}) Anomaly Detection Results: \nBase Rate: {:.2f}, AUROC: {:.2f}, AUPR+: {:.2f}, AUPR-: {:.2f}".format(func_name.upper(), normality_base_rate, auroc, n_aupr, ab_aupr))
+#                     print("({} MC-Dropout) Anomaly Detection Results: \nBase Rate: {:.2f}/{:.3f}, AUROC: {:.2f}/{:.3f}, AUPR+: {:.2f}/{:.3f}, AUPR-: {:.2f}/{:.3f}".format(
+#                           func_name,
+#                           np.mean(normality_base_rate_list), np.std(normality_base_rate_list),
+#                           np.mean(auroc_list), np.std(auroc_list),
+#                           np.mean(n_aupr_list), np.std(n_aupr_list),
+#                           np.mean(ab_aupr_list), np.std(ab_aupr_list)))
 
-                    anom_result_dict[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
-                                                                            (np.mean(n_aupr_list), np.std(n_aupr_list)),
-                                                                            (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
+#                     anom_result_dict[scale][ood_dataset_name][func_name] = [(np.mean(auroc_list), np.std(auroc_list)),
+#                                                                             (np.mean(n_aupr_list), np.std(n_aupr_list)),
+#                                                                             (np.mean(ab_aupr_list), np.std(ab_aupr_list))]
 
-    for scale in opt_config['test_ood_scales']:
-        for ood_dataset_name in opt_config['ood_datasets']:
-            anom_result_dict[scale][ood_dataset_name] = dict(anom_result_dict[scale][ood_dataset_name])
-        anom_result_dict[scale] = dict(anom_result_dict[scale])
+#     for scale in opt_config['test_ood_scales']:
+#         for ood_dataset_name in opt_config['ood_datasets']:
+#             anom_result_dict[scale][ood_dataset_name] = dict(anom_result_dict[scale][ood_dataset_name])
+#         anom_result_dict[scale] = dict(anom_result_dict[scale])
 
-    anom_result_dict = dict(anom_result_dict)
+#     anom_result_dict = dict(anom_result_dict)
 
 
-    with open(os.path.join('saves', exp_name, 'anom_res_s:{}'.format(opt_config['num_test_samples'])), 'wb') as f:
-        pkl.dump(anom_result_dict, f)
+#     with open(os.path.join('saves', exp_name, 'anom_res_s:{}'.format(opt_config['num_test_samples'])), 'wb') as f:
+#         pkl.dump(anom_result_dict, f)
 
     print('-' * 89)
     print('Experiment directory: {}'.format(os.path.join('saves', exp_name)))
