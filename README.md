@@ -1,6 +1,5 @@
 # Adversarial Posterior Distillation (APD)
 
-This repository contains the code used for the paper [Adversarial Distillation of Bayesian Neural Network Posteriors (ICML 2018)](https://arxiv.org/pdf/1806.10317.pdf).
 
 ## Requirements
 
@@ -21,8 +20,41 @@ conda install torchvision -c pytorch
 pip install -r requirements.txt
 ```
 
+To reproduce results run the following from a CUDA enabled cluster.
 
-## Experiments
+
+#### MNIST fcNN1 (784-100-10)
+
+**MC-Dropout (p=0.5)**
+```
+python train_new.py model/config/fc1-mnist-100-drop-50.yaml opt/config/sgd-mnist.yaml mnist-50000 --cuda --mc_dropout_passes 200
+```
+```
+python train_new.py model/config/fc1-svhn-100-drop-50.yaml opt/config/sgd-svhn.yaml svhn-50000 --cuda --mc_dropout_passes 200
+```
+
+**SGLD**
+```
+python train_new.py model/config/fc1-mnist-100.yaml opt/config/sgld-mnist-1-1.yaml mnist-50000 --cuda
+```
+```
+python train_new.py model/config/fc1-svhn-100.yaml opt/config/sgld-svhn-1-1.yaml svhn-50000 --cuda
+```
+
+**APD**
+```
+python gan.py fc1-mnist-100-X-sgld-mnist-1-1-X-mnist-50000@DATE opt/gan-config/gan1.yaml
+```
+```
+python gan.py fc1-svhn-100-X-sgld-svhn-1-1-X-svhn-50000@DATE opt/gan-config/gan1.yaml
+```
+
+
+
+-----
+
+
+<!-- ## Experiments
 
 ### Toy 2D Classification
 
@@ -41,10 +73,16 @@ python train_new.py model/config/fc1-mnist-100.yaml opt/config/sgd-mnist.yaml mn
 ```
 python train_new.py model/config/fc1-mnist-100-drop-50.yaml opt/config/sgd-mnist.yaml mnist-50000 --cuda --mc_dropout_passes 200
 ```
+```
+python train_new.py model/config/fc1-svhn-100-drop-50.yaml opt/config/sgd-svhn.yaml svhn-50000 --cuda --mc_dropout_passes 200
+```
 
 **SGLD**
 ```
 python train_new.py model/config/fc1-mnist-100.yaml opt/config/sgld-mnist-1-1.yaml mnist-50000 --cuda
+```
+```
+python train_new.py model/config/fc1-svhn-100.yaml opt/config/sgld-svhn-1-1.yaml svhn-50000 --cuda
 ```
 
 **APD**
@@ -173,3 +211,4 @@ If you use this code, please cite:
   year={2018}
 }
 ```
+ -->
